@@ -15,3 +15,4 @@ export {
     InteractionRequiredAuthError,
     ServerAuthError
 } from "./AuthError";
+export {Configuration} from "./Configuration";
