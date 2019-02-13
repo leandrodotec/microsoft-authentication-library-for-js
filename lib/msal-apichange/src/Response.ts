@@ -8,5 +8,5 @@ export type AuthResponse = {
     scopes: Array<string>;  
     expiresOn: Date;
     account: Account;
-    userState: string;
+    state: string;
 };

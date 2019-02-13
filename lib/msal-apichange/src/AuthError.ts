@@ -129,10 +129,10 @@ export class ClientConfigurationAuthError extends ClientAuthError {
     static createNoCallbackGivenError(tokenType: string, userState: string) : ClientConfigurationAuthError {
         return new ClientConfigurationAuthError("Error in configuration: no callback(s) registered for login/acquireTokenRedirect flows. Plesae call handleRedirectCallbacks() with the appropriate callback signatures. More information is available here: https://github.com/AzureAD/microsoft-authentication-library-for-js/wiki/-basics", tokenType, userState);
     }
-
-    static createCallbackParametersError(numArgs: number, tokenType: string, userState: string) : ClientAuthError {
-        return new ClientConfigurationAuthError("Error occurred in callback - incorrect number of arguments, expected 2, got " + numArgs + ".", tokenType, userState);
-    }
+    //
+    // static createCallbackParametersError(numArgs: number, tokenType: string, userState: string) : ClientAuthError {
+    //     return new ClientConfigurationAuthError("Error occurred in callback - incorrect number of arguments, expected 2, got " + numArgs + ".", tokenType, userState);
+    // }
 
     static createSuccessCallbackParametersError(numArgs: number, tokenType: string, userState: string) : ClientAuthError {
         return new ClientConfigurationAuthError("Error occurred in callback for successful token response - incorrect number of arguments, expected 1, got " + numArgs + ".", tokenType, userState);
@@ -160,6 +160,7 @@ export class ClientConfigurationAuthError extends ClientAuthError {
  *
  * Error thrown when there is an error with the server code, for example, unavailability.
  */
+// Rename - service temporarily unavailable
 export class ServerAuthError extends AuthError {
     constructor(message: string, tokenType: string, userState: string) {
         super(message, tokenType, userState);
