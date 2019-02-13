@@ -37,6 +37,8 @@ import { Utils } from "./Utils";
 import { AuthorityFactory } from "./AuthorityFactory";
 import { TConfiguration, Configuration } from "./Configuration";
 import { AuthenticationParameters } from "./Request";
+import * as MSALError from "./AuthError";
+import {AuthResponse} from "./Response";
 
 declare global {
   interface Window {
@@ -78,7 +80,15 @@ export interface CacheResult {
  * @param tokenReceivedCallback.tokenType tokenType returned from the STS if API call is successful. Possible values are: id_token OR access_token.
  */
 export type tokenReceivedCallback = (errorDesc: string, token: string, error: string, tokenType: string, userState: string) => void;
-
+export type tokenResponseCallback = (response: AuthResponse) => void;
+/*
+ * A type alias of for a tokenReceivedCallback function.
+ * @param tokenReceivedCallback.errorDesc error description returned from the STS if API call fails.
+ * @param tokenReceivedCallback.token token returned from STS if token request is successful.
+ * @param tokenReceivedCallback.error error code returned from the STS if API call fails.
+ * @param tokenReceivedCallback.tokenType tokenType returned from the STS if API call is successful. Possible values are: id_token OR access_token.
+ */
+export type errorResponseCallback = (error: MSALError.AuthError) => void;
 
 /*
  * wrapper around acquireTokenSilent() to handle tokens out of iframe
@@ -96,7 +106,6 @@ const resolveTokenOnlyIfOutOfIframe = (target: any, propertyKey: string, descrip
   return descriptor;
 };
 
-
 /*
  * UserAgentApplication class
  *
@@ -108,15 +117,25 @@ export class UserAgentApplication {
    */
   pConfig: TConfiguration;
 
-  /** 
+  /**
    * @hidden
    * TODO: Remove this from Configuration and add this as a parameter to redirect() calls
    */
   private pTokenReceivedCallback: tokenReceivedCallback = null;
 
+    /**
+     * @hidden
+     */
+    private pTokenResponseCallback: tokenResponseCallback = null;
+
+  /**
+   * @hidden
+   */
+  private pErrorReceivedCallback: errorResponseCallback = null;
+
   /** Authority Support Code */
 
-  /** 
+  /**
    * @hidden
    */
   protected authorityInstance: Authority;
@@ -139,11 +158,11 @@ export class UserAgentApplication {
     return this.authorityInstance.CanonicalAuthority;
   }
 
-  /** 
-   * Validate cache location and initialize storage 
+  /**
+   * Validate cache location and initialize storage
    */
 
-  /** 
+  /**
    * @hidden
    */
   private cacheLocations = {
@@ -151,13 +170,13 @@ export class UserAgentApplication {
     sessionStorage: "sessionStorage"
   };
 
-  /** 
+  /**
    * Used to get the cache location
    */
   get cacheLocation(): string {
     return this.pConfig.cache.cacheLocation;
   }
-  /** 
+  /**
    * @hidden
    */
   protected pCacheStorage: Storage;
@@ -165,13 +184,13 @@ export class UserAgentApplication {
 
   /** Other Variables */
 
-  /** 
-   * @hidden 
+  /**
+   * @hidden
    * Tracks if login is already initiated
    */
   private pLoginInProgress: boolean;
 
-  /** 
+  /**
    * @hidden
    * Tracks in Token Request is already initiated
    */
@@ -187,13 +206,13 @@ export class UserAgentApplication {
    */
   private pSilentLogin: boolean;
 
-  /** 
+  /**
    * @hidden
    * Account object - Current login/token request account
    */
   private pAccount: Account;
 
-  /** 
+  /**
    * Initialize a UserAgentApplication with a given clientId and authority.
    * @constructor
    * @param {string} clientId - The clientID of your application, you should get this from the application registration portal.
@@ -204,13 +223,14 @@ export class UserAgentApplication {
    * @param pTokenReceivedCallback -  The function that will get the call back once this API is completed (either successfully or with a failure).
    * @param {boolean} validateAuthority -  boolean to turn authority validation on/off.
    */
-  constructor(config: TConfiguration, callback: tokenReceivedCallback) {
+  constructor(config: TConfiguration, callback: tokenResponseCallback, errorCb: errorResponseCallback) {
 
-    // Set the Configuration 
+    // Set the Configuration
     this.pConfig = config;
 
-    // Set the callback
-    this.pTokenReceivedCallback = callback;
+    // Set the callback(s)
+    this.pTokenResponseCallback = callback;
+    this.pErrorReceivedCallback = errorCb;
 
     // TODO: New design for redirect - add a new function. Placeholder until then
     // this.pTokenReceivedCallback = tokenReceivedCallback;
@@ -219,12 +239,12 @@ export class UserAgentApplication {
     this.pAcquireTokenInProgress = false;
 
     if (!this.cacheLocations[this.pConfig.cache.cacheLocation]) {
-      throw new Error("Cache Location is not valid. Provided value:" + this.pConfig.cache.cacheLocation + ".Possible values are: " + this.cacheLocations.localStorage + ", " + this.cacheLocations.sessionStorage);
+        throw MSALError.ClientConfigurationAuthError.createInvalidCacheLocationConfigError(this.pConfig.cache.cacheLocation, "", this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
     }
     this.pCacheStorage = new Storage(this.pConfig.cache.cacheLocation); //cache keys msal
 
     // Initialize the Window Handling code
-    // TODO: refactor - write a utility function 
+    // TODO: refactor - write a utility function
     window.openedWindows = [];
     window.activeRenewals = {};
     window.renewStates = [];
@@ -248,7 +268,7 @@ export class UserAgentApplication {
     }
   }
 
-  /** 
+  /**
    * Used to get the redirect uri. Evaluates redirectUri if its a function, otherwise simply returns its value.
    * @ignore
    * @hidden
@@ -261,7 +281,7 @@ export class UserAgentApplication {
   }
 
 
-  /** 
+  /**
    * Used to get the post logout redirect uri. Evaluates postLogoutredirectUri if its a function, otherwise simply returns its value.
    * @ignore
    * @hidden
@@ -274,7 +294,7 @@ export class UserAgentApplication {
   }
 
 
-  /** 
+  /**
    * Used to call the constructor callback with the token/error
    * @param {string} [hash=window.location.hash] - Hash fragment of Url.
    * @hidden
@@ -309,7 +329,7 @@ export class UserAgentApplication {
   }
 
 
-  /** 
+  /**
    * Initiate the login process by redirecting the user to the STS authorization endpoint.
    * @param {Array.<string>} scopes - Permissions you want included in the access token. Not all scopes are guaranteed to be included in the access token returned.
    * @param {string} extraQueryParameters - Key-value pairs to pass to the authentication server during the interactive authentication flow.
@@ -364,8 +384,8 @@ export class UserAgentApplication {
 
   /**
    * @hidden
-   * @param scopes 
-   * @param extraQueryParameters 
+   * @param scopes
+   * @param extraQueryParameters
    */
   private loginRedirectHelper(scopes?: Array<string>, extraQueryParameters?: string) {
     this.pLoginInProgress = true;
@@ -397,10 +417,10 @@ export class UserAgentApplication {
       });
   }
 
-  /** 
+  /**
    * Initiate the login process by redirecting the user to the STS authorization endpoint.
    * TODO: Refactor removing extraQueryParams
-   * 
+   *
    * @param {Array.<string>} scopes - Permissions you want included in the access token. Not all scopes are guaranteed to be included in the access token returned.
    * @param {string} extraQueryParameters - Key-value pairs to pass to the authentication server during the interactive authentication flow.
    */
@@ -412,19 +432,23 @@ export class UserAgentApplication {
      */
     if (this.pLoginInProgress) {
       if (this.pTokenReceivedCallback) {
-        this.pTokenReceivedCallback(ErrorDescription.loginProgressError, null, ErrorCodes.loginProgressError, Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+          this.pErrorReceivedCallback(MSALError.ClientProgressAuthError.createLoginInProgressError(Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+        //this.pTokenReceivedCallback(ErrorDescription.loginProgressError, null, ErrorCodes.loginProgressError, Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
         return;
       }
     }
 
     if (authParams.scopes) {
-      const isValidScope = this.validateInputScope(authParams.scopes);
-      if (isValidScope && !Utils.isEmpty(isValidScope)) {
-        if (this.pTokenReceivedCallback) {
-          this.pTokenReceivedCallback(ErrorDescription.inputScopesError, null, ErrorCodes.inputScopesError, Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
-          return;
+        try {
+            this.validateInputScopeNew(authParams.scopes, Constants.idToken);
+        } catch (e) {
+            if (e instanceof MSALError.ClientConfigurationAuthError) {
+                this.pErrorReceivedCallback(e);
+            } else {
+                this.pErrorReceivedCallback(new MSALError.AuthError(e.toString(), Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+            }
+            return;
         }
-      }
       authParams.scopes = this.filterScopes(authParams.scopes);
     }
 
@@ -436,7 +460,7 @@ export class UserAgentApplication {
     if (idTokenObject && !authParams.scopes) {
 
       this.pConfig.system.logger.info("ADAL's idToken exists. Extracting login information from ADAL's idToken ");
-     
+
       if (authParams.login_hint) {
         extraQueryParameters = Utils.constructUnifiedCacheExtraQueryParameter(idTokenObject, authParams.login_hint, extraQueryParameters );
       }
@@ -447,6 +471,7 @@ export class UserAgentApplication {
           this.pSilentLogin = false;
           this.pConfig.system.logger.info("Unified cache call is successful");
           if (this.pTokenReceivedCallback) {
+              // TODO: Change to AuthResponse object
             this.pTokenReceivedCallback.call(this, null, idToken, null, Constants.idToken, this.getAccountState(this.pSilentAuthenticationState));
           }
         }, (error) => {
@@ -463,9 +488,9 @@ export class UserAgentApplication {
   /**
    * @hidden
    * TODO: extraQueryParams - refactor
-   * 
-   * @param scopes 
-   * @param extraQueryParameters 
+   *
+   * @param scopes
+   * @param extraQueryParameters
    */
   private loginRedirectHelperNew(scopes?: Array<string>, extraQueryParameters?: string) {
     this.pLoginInProgress = true;
@@ -498,7 +523,7 @@ export class UserAgentApplication {
   }
 
 
-  /** 
+  /**
    * Initiate the login process by opening a popup window.
    * @param {Array.<string>} scopes - Permissions you want included in the access token. Not all scopes are  guaranteed to be included in the access token returned.
    * @param {string} extraQueryParameters - Key-value pairs to pass to the STS during the interactive authentication flow.
@@ -550,14 +575,14 @@ export class UserAgentApplication {
   }
 
   /**
-   * 
+   *
    * @hidden
    * TODO: extraQueryParams - refactor
-   * 
-   * @param resolve 
-   * @param reject 
-   * @param scopes 
-   * @param extraQueryParameters 
+   *
+   * @param resolve
+   * @param reject
+   * @param scopes
+   * @param extraQueryParameters
    */
   private loginPopupHelper(resolve: any, reject: any, scopes: Array<string>, extraQueryParameters?: string) {
     //TODO why this is needed only for loginpopup
@@ -611,11 +636,11 @@ export class UserAgentApplication {
     });
   }
 
-  /** 
+  /**
      * Initiate the login process by opening a popup window.
      * TODO: extraQueryParams - refactor
-     * 
-     * @param {AuthenticationParameters} 
+     *
+     * @param {AuthenticationParameters}
      * @returns {Promise.<string>} - A Promise that is fulfilled when this function has completed, or rejected if an error was raised. Returns the token or error.
      */
   loginPopupNew(authParams: AuthenticationParameters): Promise<string> {
@@ -626,16 +651,21 @@ export class UserAgentApplication {
      */
     return new Promise<string>((resolve, reject) => {
       if (this.pLoginInProgress) {
-        reject(ErrorCodes.loginProgressError + Constants.resourceDelimeter + ErrorCodes.loginProgressError);
+        reject(MSALError.ClientProgressAuthError.createLoginInProgressError(Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
         return;
       }
 
       if (authParams.scopes) {
-        const isValidScope = this.validateInputScope(authParams.scopes);
-        if (isValidScope && !Utils.isEmpty(isValidScope)) {
-          reject(ErrorCodes.inputScopesError + Constants.resourceDelimeter + ErrorCodes.inputScopesError);
-          return;
-        }
+          try {
+              this.validateInputScopeNew(authParams.scopes, Constants.idToken);
+          } catch (e) {
+              if (e instanceof MSALError.ClientConfigurationAuthError) {
+                  reject(e);
+              } else {
+                  reject(new MSALError.AuthError(e.toString(), Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+              }
+              return;
+          }
 
         authParams.scopes = this.filterScopes(authParams.scopes);
       }
@@ -692,11 +722,11 @@ export class UserAgentApplication {
   /**
    * @hidden
    * TODO: extraQueryParams - refactor
-   * 
-   * @param resolve 
-   * @param reject 
-   * @param scopes 
-   * @param extraQueryParameters 
+   *
+   * @param resolve
+   * @param reject
+   * @param scopes
+   * @param extraQueryParameters
    */
   loginPopupHelperNew(resolve: any, reject: any, scopes: Array<string>, extraQueryParameters?: string) {
     //TODO why this is needed only for loginpopup
@@ -738,7 +768,7 @@ export class UserAgentApplication {
       this.pCacheStorage.setItem(Constants.msalError, ErrorCodes.endpointResolutionError);
       this.pCacheStorage.setItem(Constants.msalErrorDescription, ErrorDescription.endpointResolutionError);
       if (reject) {
-        reject(ErrorCodes.endpointResolutionError + ":" + ErrorDescription.endpointResolutionError);
+        reject(MSALError.ClientAuthError.createEndpointResolutionError("", Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
       }
 
       if (popUpWindow) {
@@ -746,12 +776,12 @@ export class UserAgentApplication {
       }
     }).catch((err) => {
       this.pConfig.system.logger.warning("could not resolve endpoints");
-      reject(err);
+      reject(MSALError.ClientAuthError.createEndpointResolutionError(err.toString(), Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
     });
   }
 
 
-  /** 
+  /**
    * Used to acquire an access token for a new user using interactive authentication via a popup Window.
    * To request an id_token, pass the clientId as the only scope in the scopes array.
    * @param {Array<string>} scopes - Permissions you want included in the access token. Not all scopes are  guaranteed to be included in the access token. Scopes like "openid" and "profile" are sent with every request.
@@ -857,12 +887,12 @@ export class UserAgentApplication {
   }
 
 
-  /** 
+  /**
    * Used to acquire an access token for a new user using interactive authentication via a popup Window.
    * To request an id_token, pass the clientId as the only scope in the scopes array.
-   * 
+   *
    * TODO: extraQueryParameters - refactor
-   * 
+   *
    * @param {Array<string>} scopes - Permissions you want included in the access token. Not all scopes are  guaranteed to be included in the access token. Scopes like "openid" and "profile" are sent with every request.
    * @param {string} authority - A URL indicating a directory that MSAL can use to obtain tokens.
    * - In Azure AD, it is of the form https://&lt;tenant&gt;/&lt;tenant&gt;, where &lt;tenant&gt; is the directory host (e.g. https://login.microsoftonline.com) and &lt;tenant&gt; is a identifier within the directory itself (e.g. a domain associated to the tenant, such as contoso.onmicrosoft.com, or the GUID representing the TenantID property of the directory)
@@ -875,10 +905,19 @@ export class UserAgentApplication {
   acquireTokenPopupNew(authParams: AuthenticationParameters): Promise<string> {
 
     return new Promise<string>((resolve, reject) => {
-      const isValidScope = this.validateInputScope(authParams.scopes);
-      if (isValidScope && !Utils.isEmpty(isValidScope)) {
-        reject(ErrorCodes.inputScopesError + Constants.resourceDelimeter + isValidScope);
-      }
+        try {
+            this.validateInputScopeNew(authParams.scopes, Constants.accessToken);
+        } catch (e) {
+            if (e instanceof MSALError.ClientConfigurationAuthError) {
+                reject(e);
+            } else {
+                reject(new MSALError.ClientAuthError(e.toString(), Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+            }
+        }
+      // const isValidScope = this.validateInputScope(authParams.scopes);
+      // if (isValidScope && !Utils.isEmpty(isValidScope)) {
+      //       reject(ErrorCodes.inputScopesError + Constants.resourceDelimeter + isValidScope);
+      //   }
 
       if (authParams.scopes) {
         authParams.scopes = this.filterScopes(authParams.scopes);
@@ -888,20 +927,19 @@ export class UserAgentApplication {
       const accountObject = authParams.account ? authParams.account : this.getAccount();
 
       if (this.pAcquireTokenInProgress) {
-        reject(ErrorCodes.acquireTokenProgressError + Constants.resourceDelimeter + ErrorDescription.acquireTokenProgressError);
+        reject(MSALError.ClientProgressAuthError.createAcquireTokenInProgressError(Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
         return;
       }
 
       const scope = authParams.scopes.join(" ").toLowerCase();
       let extraQueryParameters = Utils.constructExtraQueryParametersString(authParams.extraQueryParameters);
 
-      //if user is not currently logged in and no login_hint is passed 
+      //if user is not currently logged in and no login_hint is passed
       // TODO: authParams now pass login_hint
       //if (!accountObject && !(extraQueryParameters && (extraQueryParameters.indexOf(Constants.login_hint) !== -1))) {
         if (!accountObject && !(authParams.login_hint)) {
           this.pConfig.system.logger.info("User login is required");
-          reject(ErrorCodes.userLoginError + Constants.resourceDelimeter + ErrorDescription.userLoginError);
-        
+          reject(MSALError.InteractionRequiredAuthError.createLoginRequiredAuthError(Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
           return;
       }
 
@@ -926,7 +964,6 @@ export class UserAgentApplication {
         }
 
         this.pCacheStorage.setItem(Constants.nonceIdToken, authenticationRequest.nonce);
-        authenticationRequest.state = authenticationRequest.state;
         var acquireTokenUserKey;
         if (accountObject) {
           acquireTokenUserKey = Constants.acquireTokenUser + Constants.resourceDelimeter + accountObject.homeAccountIdentifier + Constants.resourceDelimeter + authenticationRequest.state;
@@ -957,19 +994,19 @@ export class UserAgentApplication {
         this.pCacheStorage.setItem(Constants.msalError, ErrorCodes.endpointResolutionError);
         this.pCacheStorage.setItem(Constants.msalErrorDescription, ErrorDescription.endpointResolutionError);
         if (reject) {
-          reject(ErrorCodes.endpointResolutionError + Constants.resourceDelimeter + ErrorDescription.endpointResolutionError);
+          reject(MSALError.ClientAuthError.createEndpointResolutionError("", Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
         }
         if (popUpWindow) {
           popUpWindow.close();
         }
       }).catch((err) => {
         this.pConfig.system.logger.warning("could not resolve endpoints");
-        reject(err);
+        reject(MSALError.ClientAuthError.createEndpointResolutionError(err.toString(), Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
       });
     });
   }
 
-  /** 
+  /**
    * Used to get the token from cache.
    * MSAL will return the cached token if it is not expired.
    * Or it will send a request to the STS to obtain an access_token using a hidden iframe. To renew idToken, clientId should be passed as the only scope in the scopes array.
@@ -997,7 +1034,7 @@ export class UserAgentApplication {
         const scope = scopes.join(" ").toLowerCase();
         const accountObject = account ? account : this.getAccount();
         const adalIdToken = this.pCacheStorage.getItem(Constants.adalIdToken);
-        //if user is not currently logged in and no login_hint/sid is passed as an extraQueryParamater
+        //if user is not currently logged in and no login_hint/sid is passed as an extraQueryParameter
         if (!accountObject && Utils.checkSSO(extraQueryParameters) && Utils.isEmpty(adalIdToken)) {
           this.pConfig.system.logger.info("User login is required");
           reject(ErrorCodes.userLoginError + Constants.resourceDelimeter + ErrorDescription.userLoginError);
@@ -1077,12 +1114,11 @@ export class UserAgentApplication {
     });
   }
 
-
-  /** 
+  /**
    * Used to get the token from cache.
-   * 
+   *
    * TODO: extraQueryParams - refactor
-   * 
+   *
    * MSAL will return the cached token if it is not expired.
    * Or it will send a request to the STS to obtain an access_token using a hidden iframe. To renew idToken, clientId should be passed as the only scope in the scopes array.
    * @param {Array<string>} scopes - Permissions you want included in the access token. Not all scopes are  guaranteed to be included in the access token. Scopes like "openid" and "profile" are sent with every request.
@@ -1096,12 +1132,28 @@ export class UserAgentApplication {
    */
   @resolveTokenOnlyIfOutOfIframe
   acquireTokenSilentNew(authParams: AuthenticationParameters): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-      const isValidScope = this.validateInputScope(authParams.scopes);
-      if (isValidScope && !Utils.isEmpty(isValidScope)) {
-        reject(ErrorCodes.inputScopesError + "|" + isValidScope);
-        return null;
+      var tokenType: string;
+      if (authParams.scopes && authParams.scopes.indexOf(this.pConfig.auth.clientId) > -1 && authParams.scopes.length === 1) {
+          tokenType = Constants.idToken;
       } else {
+          tokenType = Constants.accessToken;
+      }
+    return new Promise<string>((resolve, reject) => {
+        try {
+            this.validateInputScopeNew(authParams.scopes, tokenType);
+        } catch (e) {
+            if (e instanceof MSALError.ClientConfigurationAuthError) {
+                reject(e);
+            } else {
+                reject(new MSALError.ClientAuthError(e.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+            }
+            return null;
+        }
+      // const isValidScope = this.validateInputScope(authParams.scopes);
+      // if (isValidScope && !Utils.isEmpty(isValidScope)) {
+      //   reject(ErrorCodes.inputScopesError + "|" + isValidScope);
+      //   return null;
+      // } else {
         if (authParams.scopes) {
           authParams.scopes = this.filterScopes(authParams.scopes);
         }
@@ -1118,8 +1170,7 @@ export class UserAgentApplication {
         // if (!accountObject && Utils.checkSSO(extraQueryParameters) && Utils.isEmpty(adalIdToken)) {
         if (!accountObject && !(authParams.login_hint) && !(authParams.sid) && Utils.isEmpty(adalIdToken)) {
           this.pConfig.system.logger.info("User login is required");
-          reject(ErrorCodes.userLoginError + Constants.resourceDelimeter + ErrorDescription.userLoginError);
-
+          reject(MSALError.InteractionRequiredAuthError.createLoginRequiredAuthError(Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
           return null;
         }
         //if user didn't passes the login_hint and adal's idtoken is present and no userobject, use the login_hint from adal's idToken
@@ -1145,19 +1196,29 @@ export class UserAgentApplication {
             authenticationRequest = new AuthenticationRequestParameters(AuthorityFactory.CreateInstance(authParams.authority, this.pConfig.auth.validateAuthority), this.pConfig.auth.clientId, authParams.scopes, ResponseTypes.id_token_token, this.getRedirectUri(), this.pConfig.auth.state);
           }
         }
+        var cacheResult: CacheResult;
+        try {
+            cacheResult = this.getCachedToken(authenticationRequest, accountObject);
+        } catch (e) {
+            if (e instanceof MSALError.ClientAuthError) {
+                this.pConfig.system.logger.infoPii(e.message);
+                reject(e);
+            } else {
+                this.pConfig.system.logger.infoPii(e.toString());
+                reject(new MSALError.ClientAuthError(e.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+            }
+            return null;
+        }
 
-        const cacheResult = this.getCachedToken(authenticationRequest, accountObject);
-        if (cacheResult) {
-          if (cacheResult.token) {
+        if (cacheResult && cacheResult.token) {
             this.pConfig.system.logger.info("Token is already in cache for scope:" + scope);
             resolve(cacheResult.token);
             return null;
-          }
-          else if (cacheResult.errorDesc || cacheResult.error) {
-            this.pConfig.system.logger.infoPii(cacheResult.errorDesc + ":" + cacheResult.error);
-            reject(cacheResult.errorDesc + Constants.resourceDelimeter + cacheResult.error);
-            return null;
-          }
+          // else if (cacheResult.errorDesc || cacheResult.error) {
+          //   this.pConfig.system.logger.infoPii(cacheResult.errorDesc + ":" + cacheResult.error);
+          //   reject(cacheResult.errorDesc + Constants.resourceDelimeter + cacheResult.error);
+          //   return null;
+          // }
         }
         else {
           this.pConfig.system.logger.verbose("Token is not in cache for scope:" + scope);
@@ -1177,7 +1238,7 @@ export class UserAgentApplication {
               this.registerCallback(window.activeRenewals[scope], scope, resolve, reject);
             }
             else {
-              if (authParams.scopes && authParams.scopes.indexOf(this.pConfig.auth.clientId) > -1 && authParams.scopes.length === 1) {
+              if (tokenType === Constants.idToken) {
                 // App uses idToken to send to api endpoints
                 // Default scope is tracked as clientId to store this token
                 this.pConfig.system.logger.verbose("renewing idToken");
@@ -1189,14 +1250,14 @@ export class UserAgentApplication {
             }
           }).catch((err) => {
             this.pConfig.system.logger.warning("could not resolve endpoints");
-            reject(err);
+            reject(MSALError.ClientAuthError.createEndpointResolutionError(err.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
             return null;
           });
-      }
+      // }
     });
   }
 
-  /** 
+  /**
    * Used to obtain an access_token by redirecting the user to the authorization endpoint.
    * To renew idToken, clientId should be passed as the only scope in the scopes array.
    * @param {Array<string>} scopes - Permissions you want included in the access token. Not all scopes are  guaranteed to be included in the access token. Scopes like "openid" and "profile" are sent with every request.
@@ -1279,7 +1340,7 @@ export class UserAgentApplication {
     });
   }
 
-  /** 
+  /**
    * Used to obtain an access_token by redirecting the user to the authorization endpoint.
    * To renew idToken, clientId should be passed as the only scope in the scopes array.
    * @param {Array<string>} scopes - Permissions you want included in the access token. Not all scopes are  guaranteed to be included in the access token. Scopes like "openid" and "profile" are sent with every request.
@@ -1290,15 +1351,30 @@ export class UserAgentApplication {
    * @param {User} user - The user for which the scopes are requested.The default user is the logged in user.
    * @param {string} extraQueryParameters - Key-value pairs to pass to the STS during the  authentication flow.
    */
-  
+
    acquireTokenRedirectNew(authParams: AuthenticationParameters): void {
-    const isValidScope = this.validateInputScope(authParams.scopes);
-    if (isValidScope && !Utils.isEmpty(isValidScope)) {
-      if (this.pTokenReceivedCallback) {
-        this.pTokenReceivedCallback(ErrorDescription.inputScopesError, null, ErrorCodes.inputScopesError, Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
-        return;
+      var tokenType: string;
+      if (authParams.scopes && authParams.scopes.indexOf(this.pConfig.auth.clientId) > -1 && authParams.scopes.length === 1) {
+          tokenType = Constants.idToken;
+      } else {
+          tokenType = Constants.accessToken;
       }
-    }
+       try {
+           this.validateInputScopeNew(authParams.scopes, tokenType);
+       } catch (e) {
+           if (e instanceof MSALError.ClientConfigurationAuthError) {
+               this.pErrorReceivedCallback(e);
+           } else {
+               this.pErrorReceivedCallback(new MSALError.ClientAuthError(e.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+           }
+       }
+    // const isValidScope = this.validateInputScope(authParams.scopes);
+    // if (isValidScope && !Utils.isEmpty(isValidScope)) {
+    //   if (this.pTokenReceivedCallback) {
+    //     this.pTokenReceivedCallback(ErrorDescription.inputScopesError, null, ErrorCodes.inputScopesError, Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+    //     return;
+    //   }
+    // }
 
     if (authParams.scopes) {
         authParams.scopes = this.filterScopes(authParams.scopes);
@@ -1306,6 +1382,7 @@ export class UserAgentApplication {
 
     const accountObject = authParams.account ? authParams.account : this.getAccount();
     if (this.pAcquireTokenInProgress) {
+        this.pErrorReceivedCallback(MSALError.ClientProgressAuthError.createAcquireTokenInProgressError(tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
       return;
     }
 
@@ -1317,7 +1394,8 @@ export class UserAgentApplication {
     if (!accountObject && !(authParams.login_hint)) {
       if (this.pTokenReceivedCallback) {
         this.pConfig.system.logger.info("User login is required");
-        this.pTokenReceivedCallback(ErrorDescription.userLoginError, null, ErrorCodes.userLoginError, Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+        this.pErrorReceivedCallback(MSALError.InteractionRequiredAuthError.createLoginRequiredAuthError(tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+        // this.pTokenReceivedCallback(ErrorDescription.userLoginError, null, ErrorCodes.userLoginError, Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
         return;
       }
     }
@@ -1392,7 +1470,7 @@ export class UserAgentApplication {
       this.pCacheStorage.setItem(Constants.msalError, ErrorCodes.popUpWindowError);
       this.pCacheStorage.setItem(Constants.msalErrorDescription, ErrorDescription.popUpWindowError);
       if (reject) {
-        reject(ErrorCodes.popUpWindowError + Constants.resourceDelimeter + ErrorDescription.popUpWindowError);
+        reject(MSALError.ClientAuthError.createPopupWindowError("", this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
       }
       return null;
     }
@@ -1401,7 +1479,7 @@ export class UserAgentApplication {
     var pollTimer = window.setInterval(() => {
       if (popupWindow && popupWindow.closed && instance.pLoginInProgress) {
         if (reject) {
-          reject(ErrorCodes.userCancelledError + Constants.resourceDelimeter + ErrorDescription.userCancelledError);
+          reject(MSALError.ClientProgressAuthError.createUserCancelledError("", this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
         }
         window.clearInterval(pollTimer);
         if (this.pConfig.framework.isAngular) {
@@ -1526,7 +1604,7 @@ export class UserAgentApplication {
    */
   private validateInputScope(scopes: Array<string>): string {
     if (!scopes || scopes.length < 1) {
-      return "Scopes cannot be passed as an empty array";
+       return "Scopes cannot be passed as an empty array";
     }
 
     if (!Array.isArray(scopes)) {
@@ -1540,6 +1618,30 @@ export class UserAgentApplication {
     }
     return "";
   }
+
+    /*
+     * Used to validate the scopes input parameter requested  by the developer.
+     * @param {Array<string>} scopes - Developer requested permissions. Not all scopes are guaranteed to be included in the access token returned.
+     * @ignore
+     * @hidden
+     */
+    private validateInputScopeNew(scopes: Array<string>, tokenType: string): void {
+        if (!scopes || scopes.length < 1) {
+            throw MSALError.ClientConfigurationAuthError.createEmptyScopesArrayError(scopes.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+            //return "Scopes cannot be passed as an empty array";
+        }
+
+        if (!Array.isArray(scopes)) {
+            throw MSALError.ClientConfigurationAuthError.createScopesNonArrayError(scopes, tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+            //throw new Error("API does not accept non-array scopes");
+        }
+
+        if (scopes.indexOf(this.pConfig.auth.clientId) > -1) {
+            if (scopes.length > 1) {
+                throw MSALError.ClientConfigurationAuthError.createClientIdSingleScopeError(scopes.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+            }
+        }
+    }
 
   /*
     * Used to remove openid and profile from the list of scopes passed by the developer.These scopes are added by default
@@ -1650,21 +1752,23 @@ export class UserAgentApplication {
         authenticationRequest.authorityInstance = AuthorityFactory.CreateInstance(accessTokenCacheItem.key.authority, this.pConfig.auth.validateAuthority);
       }
       else if (filteredItems.length > 1) {
-        return {
-          errorDesc: "The cache contains multiple tokens satisfying the requirements. Call AcquireToken again providing more requirements like authority",
-          token: null,
-          error: "multiple_matching_tokens_detected"
-        };
+          throw MSALError.ClientAuthError.createMultipleMatchingTokensInCacheError(scopes.toString(), Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+        // return {
+        //   errorDesc: "The cache contains multiple tokens satisfying the requirements. Call AcquireToken again providing more requirements like authority",
+        //   token: null,
+        //   error: "multiple_matching_tokens_detected"
+        // };
       }
       else {
         //no match found. check if there was a single authority used
         const authorityList = this.getUniqueAuthority(tokenCacheItems, "authority");
         if (authorityList.length > 1) {
-          return {
-            errorDesc: "Multiple authorities found in the cache. Pass authority in the API overload.",
-            token: null,
-            error: "multiple_matching_tokens_detected"
-          };
+            throw MSALError.ClientAuthError.createMultipleAuthoritiesInCacheError(scopes.toString(), Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+          // return {
+          //   errorDesc: "Multiple authorities found in the cache. Pass authority in the API overload.",
+          //   token: null,
+          //   error: "multiple_matching_tokens_detected"
+          // };
         }
 
         authenticationRequest.authorityInstance = AuthorityFactory.CreateInstance(authorityList[0], this.pConfig.auth.validateAuthority);
@@ -1690,11 +1794,12 @@ export class UserAgentApplication {
       }
       else {
         //more than one match found.
-        return {
-          errorDesc: "The cache contains multiple tokens satisfying the requirements.Call AcquireToken again providing more requirements like authority",
-          token: null,
-          error: "multiple_matching_tokens_detected"
-        };
+          throw MSALError.ClientAuthError.createMultipleMatchingTokensInCacheError(scopes.toString(), Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+        // return {
+        //   errorDesc: "The cache contains multiple tokens satisfying the requirements.Call AcquireToken again providing more requirements like authority",
+        //   token: null,
+        //   error: "multiple_matching_tokens_detected"
+        // };
       }
     }
 

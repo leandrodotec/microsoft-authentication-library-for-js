@@ -1,5 +1,5 @@
 // This Result object will be wrapped in a class and returned in the registered callback
-export type Auth Response = {
+export type AuthResponse = {
     uniqueId: string;
     tenantId: string;
     tokenType: string;
