@@ -29,7 +29,7 @@ describe('Msal', function (): any {
 
     var RESOURCE_DELIMETER = '|';
     var DEFAULT_INSTANCE = "https://login.microsoftonline.com/";
-    var TEST_REDIR_URI = "https://localhost:8081/redirect.html"
+    var TEST_REDIR_URI = "https://localhost:8081/redirect.html";
     var TENANT = 'common';
     var validAuthority = DEFAULT_INSTANCE + TENANT;
 
@@ -49,7 +49,7 @@ describe('Msal', function (): any {
                 expiresIn: "",
                 clientInfo: ""
             }
-        }
+        };
 
         return {
             getItem: function (key: any, storeAuthStateInCookie?: boolean) {
@@ -59,7 +59,7 @@ describe('Msal', function (): any {
                 return store[key];
             },
             setItem: function (key: any, value: any, storeAuthStateInCookie?: boolean) {
-                if (typeof value != 'undefined') {
+                if (typeof value !== 'undefined') {
                     store[key] = value;
                 }
                 if (storeAuthStateInCookie) {
@@ -68,7 +68,7 @@ describe('Msal', function (): any {
 
             },
             removeItem: function (key: any) {
-                if (typeof store[key] != 'undefined') {
+                if (typeof store[key] !== 'undefined') {
                     delete store[key];
                 }
             },
@@ -111,10 +111,10 @@ describe('Msal', function (): any {
                 var ca = document.cookie.split(';');
                 for (var i = 0; i < ca.length; i++) {
                     var c = ca[i];
-                    while (c.charAt(0) == ' ') {
+                    while (c.charAt(0) === ' ') {
                         c = c.substring(1);
                     }
-                    if (c.indexOf(name) == 0) {
+                    if (c.indexOf(name) === 0) {
                         return c.substring(name.length, c.length);
                     }
                 }
@@ -148,6 +148,7 @@ describe('Msal', function (): any {
                 hash: '#hash',
                 href: 'href',
                 replace: function (val: any) {
+                    return;
                 }
             },
             localStorage: {},
@@ -167,6 +168,7 @@ describe('Msal', function (): any {
         global.Math = mathMock;
 
         msal = new UserAgentApplication("0813e1d1-ad72-46a9-8665-399bba48c201", null, function (errorDes, token, error) {
+            return;
         });
         msal._user = null;
         msal._renewStates = [];
@@ -273,13 +275,13 @@ describe('Msal', function (): any {
             clientId: "0813e1d1-ad72-46a9-8665-399bba48c201",
             scopes: "S1",
             userIdentifer: "1234"
-        }
+        };
         var accessTokenValue = {
             accessToken: "accessToken",
             idToken: "idToken",
             expiresIn: "150000000000000",
             clientInfo: ""
-        }
+        };
         storageFake.setItem(JSON.stringify(accessTokenKey), JSON.stringify(accessTokenValue));
         var user = { userIdentifier: "1234" };
         let cacheResult = msal.getCachedToken({ scopes: ['S1'] }, user);
@@ -295,13 +297,13 @@ describe('Msal', function (): any {
             clientId: "0813e1d1-ad72-46a9-8665-399bba48c201",
             scopes: "S1",
             userIdentifer: "1234"
-        }
+        };
         var accessTokenValue = {
             accessToken: "accessToken",
             idToken: "idToken",
             expiresIn: "150000000000000",
             clientInfo: ""
-        }
+        };
         storageFake.setItem(JSON.stringify(accessTokenKey), JSON.stringify(accessTokenValue));
         accessTokenKey.scopes = "S1 S2";
         accessTokenKey.authority = "authority2";
@@ -320,13 +322,13 @@ describe('Msal', function (): any {
             clientId: "0813e1d1-ad72-46a9-8665-399bba48c201",
             scopes: "S1",
             userIdentifer: "1234"
-        }
+        };
         var accessTokenValue = {
             accessToken: "accessToken",
             idToken: "idToken",
             expiresIn: "150000000000000",
             clientInfo: ""
-        }
+        };
         storageFake.setItem(JSON.stringify(accessTokenKey), JSON.stringify(accessTokenValue));
         accessTokenKey.scopes = 'S2';
         accessTokenKey.authority = 'authority2';
@@ -346,13 +348,13 @@ describe('Msal', function (): any {
             clientId: "0813e1d1-ad72-46a9-8665-399bba48c201",
             scopes: "S1",
             userIdentifer: "1234"
-        }
+        };
         var accessTokenValue = {
             accessToken: "accessToken",
             idToken: "idToken",
             expiresIn: "150000000000000",
             clientInfo: ""
-        }
+        };
         storageFake.setItem(JSON.stringify(accessTokenKey), JSON.stringify(accessTokenValue));
         var user = { userIdentifier: "1234" };
         let cacheResult = msal.getCachedToken({ authority: "authority2", scopes: ['S1'] }, user);
@@ -366,13 +368,13 @@ describe('Msal', function (): any {
             clientId: "0813e1d1-ad72-46a9-8665-399bba48c201",
             scopes: "S1",
             userIdentifer: "1234"
-        }
+        };
         var accessTokenValue = {
             accessToken: "accessToken1",
             idToken: "idToken",
             expiresIn: "150000000000000",
             clientInfo: ""
-        }
+        };
         storageFake.setItem(JSON.stringify(accessTokenKey), JSON.stringify(accessTokenValue));
         accessTokenKey.authority = "authority2";
         accessTokenValue.accessToken = "accessToken2";
@@ -395,13 +397,13 @@ describe('Msal', function (): any {
             clientId: "0813e1d1-ad72-46a9-8665-399bba48c201",
             scopes: "S1",
             userIdentifer: "1234"
-        }
+        };
         var accessTokenValue = {
             accessToken: "accessToken1",
             idToken: "idToken",
             expiresIn: "150000000000000",
             clientInfo: ""
-        }
+        };
         storageFake.setItem(JSON.stringify(accessTokenKey), JSON.stringify(accessTokenValue));
         accessTokenKey.authority = validAuthority;
         accessTokenKey.scopes = "S1 S2";
@@ -420,13 +422,13 @@ describe('Msal', function (): any {
             clientId: "0813e1d1-ad72-46a9-8665-399bba48c201",
             scopes: "S1",
             userIdentifer: "1234"
-        }
+        };
         var accessTokenValue = {
             accessToken: "accessToken1",
             idToken: "idToken",
             expiresIn: "1300",
             clientInfo: ""
-        }
+        };
         storageFake.setItem(JSON.stringify(accessTokenKey), JSON.stringify(accessTokenValue));
         var user = { userIdentifier: "1234" };
         let cacheResult = msal.getCachedToken({ authority: validAuthority, scopes: ['S1'] }, user);
@@ -447,7 +449,7 @@ describe('Msal', function (): any {
         var _cacheStorage = msal._cacheStorage.removeAcquireTokenEntries;
         msal._cacheStorage.removeAcquireTokenEntries = function () {
             return;
-        }
+        };
         msal.saveTokenFromHash(requestInfo);
         msal._cacheStorage.removeAcquireTokenEntries = _cacheStorage;
         expect(storageFake.getItem(Constants.msalError)).toBe('invalid');
@@ -457,7 +459,7 @@ describe('Msal', function (): any {
     it('tests if login function exits with error if loginInProgress is true and callback is called with loginProgress error', function () {
         msal._loginInProgress = true;
         var errDesc = '', token = '', err = '', tokenType = '';
-        var callback = function (valErrDesc:string, valToken:string, valErr:string, valTokenType:string) {
+        var callback = function (valErrDesc: string, valToken: string, valErr: string, valTokenType: string) {
             errDesc = valErrDesc;
             token = valToken;
             err = valErr;
@@ -497,7 +499,7 @@ describe('Msal', function (): any {
             tokenType = valTokenType;
         };
         msal._tokenReceivedCallback = callback;
-        msal.loginRedirect([msal.clientId,'123']);
+        msal.loginRedirect([msal.clientId, '123']);
         expect(errDesc).toBe(ErrorDescription.inputScopesError);
         expect(err).toBe(ErrorCodes.inputScopesError);
         expect(token).toBe(null);
@@ -513,8 +515,8 @@ describe('Msal', function (): any {
     it('tests if hint parameters get added when user object is passed to the function', function () {
         var user = {
             userIdentifier: '1234.5678',
-            displayableId:'some_id'
-        }
+            displayableId: 'some_id'
+        };
         var urlNavigate = '';
         urlNavigate = msal.addHintParameters(urlNavigate, user);
         expect(urlNavigate).toContain("login_hint");
@@ -542,7 +544,7 @@ describe('Msal', function (): any {
         var _clearCache = msal.clearCache;
         msal.clearCache = function () {
             return;
-        }
+        };
         msal._postLogoutredirectUri = 'https://contoso.com/logout';
         spyOn(msal, 'promptUser');
         msal.logout();
@@ -554,7 +556,7 @@ describe('Msal', function (): any {
         var _clearCache = msal.clearCache;
         msal.clearCache = function () {
             return;
-        }
+        };
         msal._postLogoutredirectUri = () => 'https://contoso.com/logoutfn';
         spyOn(msal, 'promptUser');
         msal.logout();
@@ -584,18 +586,18 @@ describe('Msal', function (): any {
     });
 
     it('test getUserState with a user passed state', function () {
-        var result =msal.getUserState("123465464565|91111");
-        expect(result).toEqual("91111")
+        var result = msal.getUserState("123465464565|91111");
+        expect(result).toEqual("91111");
     });
 
     it('test getUserState when there is no user state', function () {
-        var result =msal.getUserState("123465464565");
-        expect(result).toEqual("")
+        var result = msal.getUserState("123465464565");
+        expect(result).toEqual("");
     });
 
     it('test getUserState when there is no state', function () {
-        var result =msal.getUserState("");
-        expect(result).toEqual("")
+        var result = msal.getUserState("");
+        expect(result).toEqual("");
     });
 
     it('test if authenticateRequestParameter generates state correctly, if state is a number', function () {
@@ -621,13 +623,13 @@ describe('Msal', function (): any {
     it('tests if you get the state back in tokenReceived callback, if state is a number', function () {
         spyOn(msal, 'getUserState').and.returnValue("1234");
         msal._loginInProgress = true;
-        var errDesc = '', token = '', err = '', tokenType = '', state= '' ;
-        var callback = function (valErrDesc:string, valToken:string, valErr:string, valTokenType:string, valState: string) {
+        var errDesc = '', token = '', err = '', tokenType = '', state = '' ;
+        var callback = function (valErrDesc: string, valToken: string, valErr: string, valTokenType: string, valState: string) {
             errDesc = valErrDesc;
             token = valToken;
             err = valErr;
             tokenType = valTokenType;
-            state= valState;
+            state = valState;
         };
 
         msal._tokenReceivedCallback = callback;
@@ -643,13 +645,13 @@ describe('Msal', function (): any {
     it('tests if you get the state back in tokenReceived callback, if state is a url', function () {
         spyOn(msal, 'getUserState').and.returnValue("https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-implicit-grant-flow?name=value&name2=value2");
         msal._loginInProgress = true;
-        var errDesc = '', token = '', err = '', tokenType = '', state= '' ;
-        var callback = function (valErrDesc:string, valToken:string, valErr:string, valTokenType:string, valState: string) {
+        var errDesc = '', token = '', err = '', tokenType = '', state = '' ;
+        var callback = function (valErrDesc: string, valToken: string, valErr: string, valTokenType: string, valState: string) {
             errDesc = valErrDesc;
             token = valToken;
             err = valErr;
             tokenType = valTokenType;
-            state= valState;
+            state = valState;
         };
 
         msal._tokenReceivedCallback = callback;
@@ -678,7 +680,7 @@ describe('Msal', function (): any {
             expect(document.cookie).toContain(Constants.stateLogin);
             expect(document.cookie).toContain(Constants.nonceIdToken);
             expect(document.cookie).toContain(Constants.loginRequest);
-            var urlHash = '#' + 'id_token=' + mockIdToken + '&state=' + storageFake.getItem(Constants.stateLogin) + '&nonce=' + storageFake.getItem(Constants.nonceIdToken)
+            var urlHash = '#' + 'id_token=' + mockIdToken + '&state=' + storageFake.getItem(Constants.stateLogin) + '&nonce=' + storageFake.getItem(Constants.nonceIdToken);
             storageFake.setItem(Constants.urlHash, urlHash);
             storageFake.removeItem(Constants.stateLogin);
             storageFake.removeItem(Constants.nonceIdToken);
@@ -686,7 +688,7 @@ describe('Msal', function (): any {
             msal.processCallBack(urlHash);
             msal = msalInstance;
             done();
-        }
+        };
         msal.loginRedirect();
     });
 
@@ -736,7 +738,7 @@ describe('Msal', function (): any {
 });
 
 describe('loginPopup functionality', function () {
-    var loginPopupPromise:Promise<string>;
+    var loginPopupPromise: Promise<string>;
     var msal;
     beforeEach(function () {
         msal = new UserAgentApplication("0813e1d1-ad72-46a9-8665-399bba48c201", null, function (errorDes, token, error) {

@@ -157,10 +157,27 @@ export type TConfiguration = {
  */
 export function Configuration(
     // destructure with default setting
-    { clientId = "", authority = null, validateAuthority = true, redirectUri = () => window.location.href.split("?")[0].split("#")[0], postLogoutRedirectUri = () => window.location.href.split("?")[0].split("#")[0], state = "", navigateToLoginRequestUrl = true }: TAuthOptions = {clientId},
-    { cacheLocation = "localStorage", storeAuthStateInCookie = false }: TCacheOptions = {},
-    { loadFrameTimeout = 6000, tokenRenewalOffsetSeconds = 300 }: TSystemOptions= {},
-    { isAngular = false, unprotectedResources = new Array<string>(), protectedResourceMap = new Map<string, Array<string>>() }: TFrameworkOptions = {}
+    {
+        clientId = "", authority = null,
+        validateAuthority = true,
+        redirectUri = () => window.location.href.split("?")[0].split("#")[0],
+        postLogoutRedirectUri = () => window.location.href.split("?")[0].split("#")[0],
+        state = "",
+        navigateToLoginRequestUrl = true
+    }: TAuthOptions = {clientId},
+    {
+        cacheLocation = "localStorage",
+        storeAuthStateInCookie = false
+    }: TCacheOptions = {},
+    {
+        loadFrameTimeout = 6000,
+        tokenRenewalOffsetSeconds = 300
+    }: TSystemOptions= {},
+    {
+        isAngular = false,
+        unprotectedResources = new Array<string>(),
+        protectedResourceMap = new Map<string, Array<string>>()
+    }: TFrameworkOptions = {}
 ) {
     // restructure
     let config = {
