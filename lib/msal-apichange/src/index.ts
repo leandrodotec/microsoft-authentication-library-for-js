@@ -10,9 +10,9 @@ export {TConfiguration} from "./Configuration";
 export {
     AuthError,
     ClientAuthError,
-    ClientConfigurationAuthError,
-    ClientProgressAuthError,
+    ConfigurationAuthError,
     InteractionRequiredAuthError,
-    ServerAuthError
+    ServerError
 } from "./AuthError";
 export {Configuration} from "./Configuration";
+export { AuthResponse } from "./Response";

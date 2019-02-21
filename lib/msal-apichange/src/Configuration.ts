@@ -165,7 +165,7 @@ export class Configuration {
         {isAngular = false, unprotectedResources = new Array<string>(), protectedResourceMap = new Map<string, Array<string>>()}: TFrameworkOptions = {}
     ) {
         // restructure
-        let config = {
+        let config : TConfiguration = {
             auth: {
                 clientId,
                 authority,

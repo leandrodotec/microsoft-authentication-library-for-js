@@ -271,7 +271,7 @@ export class UserAgentApplication {
     this.pAcquireTokenInProgress = false;
 
     if (!this.cacheLocations[this.pConfig.cache.cacheLocation]) {
-        throw MSALError.ClientConfigurationAuthError.createInvalidCacheLocationConfigError(this.pConfig.cache.cacheLocation, "", this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+        throw MSALError.ConfigurationAuthError.createInvalidCacheLocationConfigError(this.pConfig.cache.cacheLocation, "unavailable", config.auth.state);
     }
     this.pCacheStorage = new Storage(this.pConfig.cache.cacheLocation); //cache keys msal
 
@@ -479,20 +479,18 @@ export class UserAgentApplication {
       3) redirect user to AAD
      */
     if (this.pLoginInProgress) {
-      if (this.pTokenReceivedCallback) {
-          this.pErrorReceivedCallback(MSALError.ClientProgressAuthError.createLoginInProgressError(Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+      if (this.pErrorReceivedCallback) {
+          this.pErrorReceivedCallback(MSALError.ClientAuthError.createLoginInProgressError(Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
         //this.pTokenReceivedCallback(ErrorDescription.loginProgressError, null, ErrorCodes.loginProgressError, Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
         return;
       }
     }
 
-    // TODO: isValidScope - please rename this, gives the wrong idea
-    // TODO: The function validateInputScope() returns a blank string in case of valid scope - should this be changed?z
-    if (authParams.scopes) {
+      if (authParams.scopes) {
         try {
             this.validateInputScopeNew(authParams.scopes, Constants.idToken);
         } catch (e) {
-            if (e instanceof MSALError.ClientConfigurationAuthError) {
+            if (e instanceof MSALError.ConfigurationAuthError) {
                 this.pErrorReceivedCallback(e);
             } else {
                 this.pErrorReceivedCallback(new MSALError.AuthError(e.toString(), Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
@@ -515,13 +513,14 @@ export class UserAgentApplication {
 
       this.pSilentLogin = true;
 
-      this.acquireTokenSilent([this.pConfig.auth.clientId], this.authority, this.getAccount(), extraQueryParameters)
+      this.acquireTokenSilentNew(authParams)
         .then((idToken) => {
           this.pSilentLogin = false;
           this.pConfig.system.logger.info("Unified cache call is successful");
-          if (this.pTokenReceivedCallback) {
+ 
+          if (this.pTokenResponseCallback) {
               // TODO: Change to AuthResponse object
-            this.pTokenReceivedCallback.call(this, null, idToken, null, Constants.idToken, this.getAccountState(this.pSilentAuthenticationState));
+            this.pTokenResponseCallback.call(this, );
           }
         }, (error) => {
           this.pSilentLogin = false;
@@ -714,7 +713,7 @@ export class UserAgentApplication {
      */
     return new Promise<string>((resolve, reject) => {
       if (this.pLoginInProgress) {
-        reject(MSALError.ClientProgressAuthError.createLoginInProgressError(Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+        reject(MSALError.ClientAuthError.createLoginInProgressError(Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
         return;
       }
 
@@ -722,7 +721,7 @@ export class UserAgentApplication {
           try {
               this.validateInputScopeNew(authParams.scopes, Constants.idToken);
           } catch (e) {
-              if (e instanceof MSALError.ClientConfigurationAuthError) {
+              if (e instanceof MSALError.ConfigurationAuthError) {
                   reject(e);
               } else {
                   reject(new MSALError.AuthError(e.toString(), Constants.idToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
@@ -970,7 +969,7 @@ export class UserAgentApplication {
         try {
             this.validateInputScopeNew(authParams.scopes, Constants.accessToken);
         } catch (e) {
-            if (e instanceof MSALError.ClientConfigurationAuthError) {
+            if (e instanceof MSALError.ConfigurationAuthError) {
                 reject(e);
             } else {
                 reject(new MSALError.ClientAuthError(e.toString(), Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
@@ -989,7 +988,7 @@ export class UserAgentApplication {
       const accountObject = authParams.account ? authParams.account : this.getAccount();
 
       if (this.pAcquireTokenInProgress) {
-        reject(MSALError.ClientProgressAuthError.createAcquireTokenInProgressError(Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+        reject(MSALError.ClientAuthError.createAcquireTokenInProgressError(Constants.accessToken, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
         return;
       }
 
@@ -1205,7 +1204,7 @@ export class UserAgentApplication {
         try {
             this.validateInputScopeNew(authParams.scopes, tokenType);
         } catch (e) {
-            if (e instanceof MSALError.ClientConfigurationAuthError) {
+            if (e instanceof MSALError.ConfigurationAuthError) {
                 reject(e);
             } else {
                 reject(new MSALError.ClientAuthError(e.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
@@ -1429,7 +1428,7 @@ export class UserAgentApplication {
        try {
            this.validateInputScopeNew(authParams.scopes, tokenType);
        } catch (e) {
-           if (e instanceof MSALError.ClientConfigurationAuthError) {
+           if (e instanceof MSALError.ConfigurationAuthError) {
                this.pErrorReceivedCallback(e);
            } else {
                this.pErrorReceivedCallback(new MSALError.ClientAuthError(e.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
@@ -1449,7 +1448,7 @@ export class UserAgentApplication {
 
     const accountObject = authParams.account ? authParams.account : this.getAccount();
     if (this.pAcquireTokenInProgress) {
-        this.pErrorReceivedCallback(MSALError.ClientProgressAuthError.createAcquireTokenInProgressError(tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+        this.pErrorReceivedCallback(MSALError.ClientAuthError.createAcquireTokenInProgressError(tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
       return;
     }
 
@@ -1546,7 +1545,7 @@ export class UserAgentApplication {
     var pollTimer = window.setInterval(() => {
       if (popupWindow && popupWindow.closed && instance.pLoginInProgress) {
         if (reject) {
-          reject(MSALError.ClientProgressAuthError.createUserCancelledError("", this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
+          reject(MSALError.ClientAuthError.createUserCancelledError("", this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie))));
         }
         window.clearInterval(pollTimer);
         if (this.pConfig.framework.isAngular) {
@@ -1694,18 +1693,18 @@ export class UserAgentApplication {
      */
     private validateInputScopeNew(scopes: Array<string>, tokenType: string): void {
         if (!scopes || scopes.length < 1) {
-            throw MSALError.ClientConfigurationAuthError.createEmptyScopesArrayError(scopes.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+            throw MSALError.ConfigurationAuthError.createEmptyScopesArrayError(scopes.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
             //return "Scopes cannot be passed as an empty array";
         }
 
         if (!Array.isArray(scopes)) {
-            throw MSALError.ClientConfigurationAuthError.createScopesNonArrayError(scopes, tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+            throw MSALError.ConfigurationAuthError.createScopesNonArrayError(scopes, tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
             //throw new Error("API does not accept non-array scopes");
         }
 
         if (scopes.indexOf(this.pConfig.auth.clientId) > -1) {
             if (scopes.length > 1) {
-                throw MSALError.ClientConfigurationAuthError.createClientIdSingleScopeError(scopes.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
+                throw MSALError.ConfigurationAuthError.createClientIdSingleScopeError(scopes.toString(), tokenType, this.getAccountState(this.pCacheStorage.getItem(Constants.stateLogin, this.pConfig.cache.storeAuthStateInCookie)));
             }
         }
     }
@@ -2240,8 +2239,8 @@ export class UserAgentApplication {
     }
 
     const requestInfo = self.getRequestInfo(hash); //if(window.parent!==window), by using self, window.parent becomes equal to window in getRequestInfo method specifically
-    let token: string = null, tokenReceivedCallback: (errorDesc: string, token: string, error: string, tokenType: string) => void = null, tokenType: string, saveToken: boolean = true;
-    self.pLogger.info("Returned from redirect url");
+    let token: string = null, tokenReceivedCallback: (response: AuthResponse) => void = null, tokenType: string;
+    self.pConfig.system.logger.info("Returned from redirect url");
     if (window.parent !== window && window.parent.msal) {
       tokenReceivedCallback = window.parent.callBackMappedToRenewStates[requestInfo.stateResponse];
     }
@@ -2252,14 +2251,13 @@ export class UserAgentApplication {
       if (self._navigateToLoginRequestUrl) {
         tokenReceivedCallback = null;
         self.pCacheStorage.setItem(Constants.urlHash, hash);
-        saveToken = false;
         if (window.parent === window && !isPopup) {
           window.location.href = self.pCacheStorage.getItem(Constants.loginRequest, this.pConfig.cache.storeAuthStateInCookie);
         }
         return;
       }
       else {
-        tokenReceivedCallback = self.pTokenReceivedCallback;
+        tokenReceivedCallback = self.pTokenResponseCallback;
         window.location.hash = "";
       }
 
@@ -2269,9 +2267,9 @@ export class UserAgentApplication {
 
     if ((requestInfo.requestType === Constants.renewToken) && window.parent) {
       if (window.parent !== window) {
-        self.pLogger.verbose("Window is in iframe, acquiring token silently");
+        self.pConfig.system.logger.verbose("Window is in iframe, acquiring token silently");
       } else {
-        self.pLogger.verbose("acquiring token interactive in progress");
+        self.pConfig.system.logger.verbose("acquiring token interactive in progress");
       }
 
       token = requestInfo.parameters[Constants.accessToken] || requestInfo.parameters[Constants.idToken];
@@ -2295,7 +2293,7 @@ export class UserAgentApplication {
       }
 
     } catch (err) {
-      self.pLogger.error("Error occurred in token received callback function: " + err);
+      self.pConfig.system.logger.error("Error occurred in token received callback function: " + err);
     }
     if (isWindowOpenerMsal) {
       for (var i = 0; i < window.opener.openedWindows.length; i++) {
